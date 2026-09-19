@@ -6,25 +6,93 @@ on:
   pull_request:
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - name: Install dependencies
         run: npm install
+      - name: Lint
+        run: npm run lint
 
-      - name: Run tests with coverage
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20]
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm install
+      - name: Unit tests
+        run: npm run test:unit
+      - name: API tests
+        run: npm run test:api
+
+  coverage:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Run coverage (enforces thresholds)
         run: npm run test:coverage
-
-      - name: Upload coverage report
+      - name: Publish coverage to the job summary
+        if: always()
+        run: |
+          node -e '
+            const s = require("./coverage/coverage-summary.json").total;
+            const row = (k) => `| ${k} | ${s[k].pct}% (${s[k].covered}/${s[k].total}) |`;
+            const md = [
+              "## Coverage report", "",
+              "| Metric | Covered |", "|--------|---------|",
+              row("statements"), row("branches"), row("functions"), row("lines"), ""
+            ].join("\n");
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+          '
+      - name: Upload HTML coverage report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
+
+  build:
+    needs: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Build the package
+        run: |
+          mkdir -p dist
+          zip -r "dist/greeter-api-ci.zip" src package.json README.md
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: greeter-api-build
+          path: dist/greeter-api-ci.zip

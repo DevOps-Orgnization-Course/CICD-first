@@ -18,8 +18,15 @@ npm test           # run all tests
 npm run test:coverage   # tests + coverage report
 ```
 
-## Pipelines
-- **CI** (`.github/workflows/ci.yml`) — on every push to `main` and every pull request: install, run tests with coverage, upload the coverage report.
-- **CD** (`.github/workflows/cd.yml`) — run manually (`workflow_dispatch` with a version): test, package a zip, create a tag + GitHub Release.
+## Test & lint
+```bash
+npm run lint            # eslint
+npm run test:unit       # pure logic tests
+npm run test:api        # endpoint tests
+npm run test:coverage   # all tests + coverage
+```
 
-Both are explained line by line in `INSTRUCTOR-README.md`.
+## Pipelines
+- **CI** (`.github/workflows/ci.yml`) — on push to `main` and every PR, four jobs run in order:
+  `lint` -> `test` (Node 18 and 20 in parallel) -> `coverage` (report shown on the run Summary) -> `build` (packages a zip artifact).
+- **CD** (`.github/workflows/cd.yml`) — run manually (`workflow_dispatch` with a version): test, package a zip, create a tag + GitHub Release.
