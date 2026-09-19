@@ -1,0 +1,46 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 1.0.0"
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests before releasing
+        run: npm test
+
+      - name: Build the release package
+        run: |
+          mkdir -p dist
+          zip -r "dist/greeter-api-${{ github.event.inputs.version }}.zip" \
+            src package.json README.md
+
+      - name: Create the tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ github.event.inputs.version }}" \
+            "dist/greeter-api-${{ github.event.inputs.version }}.zip" \
+            --target "${{ github.sha }}" \
+            --title "greeter-api v${{ github.event.inputs.version }}" \
+            --notes "Automated release built by the CD pipeline."
